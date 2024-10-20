@@ -617,7 +617,7 @@ void StartPWM1(void *argument)
     if (cmdCount == 0)
       continue;
 
-    if (strcmp(cmdVctr[cmdReadIdx][0], "PWM1") ==  0) {
+    if (strcmp(cmdVctr[cmdReadIdx][0], "PWM1") == 0) {
       // Execute the command
       char param1[ARG_LENGTH];
       strcpy(param1, cmdVctr[cmdReadIdx][1]);
@@ -634,8 +634,8 @@ void StartPWM1(void *argument)
 
       // Calculate the pulse width and set the duty cycle of the signal
       uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
-      TIM3->CCR2 = pulse;
-      // __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
+      // TIM3->CCR2 = pulse;
+      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
 
       // Increase the read index and decrease the command count
       cmdReadIdx = (cmdReadIdx + 1) % CMD_VCTR_SIZE;
