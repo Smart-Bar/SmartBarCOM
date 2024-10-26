@@ -84,10 +84,10 @@ const osThreadAttr_t LED2_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for PWM1 */
-osThreadId_t PWM1Handle;
-const osThreadAttr_t PWM1_attributes = {
-  .name = "PWM1",
+/* Definitions for PWM */
+osThreadId_t PWMHandle;
+const osThreadAttr_t PWM_attributes = {
+  .name = "PWM",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
@@ -121,10 +121,11 @@ static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
 void StartLED1(void *argument);
 void StartLED2(void *argument);
-void StartPWM1(void *argument);
+void StartPWM(void *argument);
 
 /* USER CODE BEGIN PFP */
-void Parse_Command(void);
+void ParseCommand(void);
+void SelectDeMuxChannel(uint8_t);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -136,9 +137,7 @@ void Parse_Command(void);
   * @brief  The application entry point.
   * @retval int
   */
-int main(void)
-{
-
+int main(void) {
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -199,8 +198,8 @@ int main(void)
   /* creation of LED2 */
   LED2Handle = osThreadNew(StartLED2, NULL, &LED2_attributes);
 
-  /* creation of PWM1 */
-  PWM1Handle = osThreadNew(StartPWM1, NULL, &PWM1_attributes);
+  /* creation of PWM */
+  PWMHandle = osThreadNew(StartPWM, NULL, &PWM_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -230,8 +229,7 @@ int main(void)
   * @brief System Clock Configuration
   * @retval None
   */
-void SystemClock_Config(void)
-{
+void SystemClock_Config(void) {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
@@ -246,8 +244,8 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
+
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
   }
 
@@ -260,17 +258,17 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
     Error_Handler();
   }
+
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_USART3
                               |RCC_PERIPHCLK_TIM34;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   PeriphClkInit.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
   PeriphClkInit.Tim34ClockSelection = RCC_TIM34CLK_HCLK;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
+
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
     Error_Handler();
   }
 }
@@ -280,9 +278,7 @@ void SystemClock_Config(void)
   * @param None
   * @retval None
   */
-static void MX_TIM3_Init(void)
-{
-
+static void MX_TIM3_Init(void) {
   /* USER CODE BEGIN TIM3_Init 0 */
 
   /* USER CODE END TIM3_Init 0 */
@@ -294,34 +290,36 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 5625 - 1;
+  htim3.Init.Prescaler = 5625;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 255;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
-  {
+
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK) {
     Error_Handler();
   }
+
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
+
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK) {
     Error_Handler();
   }
+
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
+
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK) {
     Error_Handler();
   }
+
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
-
 }
 
 /**
@@ -329,9 +327,7 @@ static void MX_TIM3_Init(void)
   * @param None
   * @retval None
   */
-static void MX_USART2_UART_Init(void)
-{
-
+static void MX_USART2_UART_Init(void) {
   /* USER CODE BEGIN USART2_Init 0 */
 
   /* USER CODE END USART2_Init 0 */
@@ -349,14 +345,13 @@ static void MX_USART2_UART_Init(void)
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
+
+  if (HAL_UART_Init(&huart2) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
-
 }
 
 /**
@@ -364,9 +359,7 @@ static void MX_USART2_UART_Init(void)
   * @param None
   * @retval None
   */
-static void MX_USART3_UART_Init(void)
-{
-
+static void MX_USART3_UART_Init(void) {
   /* USER CODE BEGIN USART3_Init 0 */
 
   /* USER CODE END USART3_Init 0 */
@@ -384,14 +377,13 @@ static void MX_USART3_UART_Init(void)
   huart3.Init.OverSampling = UART_OVERSAMPLING_16;
   huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart3) != HAL_OK)
-  {
+
+  if (HAL_UART_Init(&huart3) != HAL_OK) {
     Error_Handler();
   }
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
-
 }
 
 /**
@@ -399,11 +391,10 @@ static void MX_USART3_UART_Init(void)
   * @param None
   * @retval None
   */
-static void MX_GPIO_Init(void)
-{
+static void MX_GPIO_Init(void) {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -412,16 +403,26 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, DMUX_C_Pin|DMUX_B_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DMUX_A_Pin|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : DMUX_C_Pin DMUX_B_Pin */
+  GPIO_InitStruct.Pin = DMUX_C_Pin|DMUX_B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
@@ -430,15 +431,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB8 PB9 */
-  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_9;
+  /*Configure GPIO pins : DMUX_A_Pin PB8 PB9 */
+  GPIO_InitStruct.Pin = DMUX_A_Pin|GPIO_PIN_8|GPIO_PIN_9;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -470,7 +471,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     // Send the received command to the command buffer if there is enough
     // space in the buffe r
     if (cmdCount < CMD_VCTR_SIZE) {
-      Parse_Command();
+      ParseCommand();
     }
 
     // Echo a newline character
@@ -482,7 +483,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   HAL_UART_Receive_IT(&huart3, textChar, 1);
 }
 
-void Parse_Command(void) {
+void ParseCommand(void) {
   // Parse the command to get its parameters
   char *input = (char*) rxBuffer;
   char *charPointer = strtok(input, " ");
@@ -502,6 +503,27 @@ void Parse_Command(void) {
   cmdCount++;
 
   memset(rxBuffer, 0, sizeof(rxBuffer));
+}
+
+/**
+ * @brief Selects the output channel of the DeMux.
+ * 
+ * Sets the appropriate pin values to pass a signal through the desired channel, which can 
+ * be 1 out 8 channels
+ * 
+ * @param channel Channel to be selected
+ * @retval None
+ */
+void SelectDeMuxChannel(uint8_t channel) {
+  // Calculate the state for each pin
+  uint8_t A = (channel & 0x01); // bit 0
+  uint8_t B = (channel & 0x02) >> 1; // bit 1
+  uint8_t C = (channel & 0x04) >> 2; // bit 2
+
+  // Set each pin state
+  HAL_GPIO_WritePin(DMUX_A_GPIO_Port, DMUX_A_Pin, A ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DMUX_B_GPIO_Port, DMUX_B_Pin, B ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DMUX_C_GPIO_Port, DMUX_C_Pin, C ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 /**
@@ -546,8 +568,7 @@ float map(float value, float fromLower, float fromUpper, float toLower, float to
   * @retval None
   */
 /* USER CODE END Header_StartLED1 */
-void StartLED1(void *argument)
-{
+void StartLED1(void *argument) {
   /* USER CODE BEGIN 5 */
   while (1) {
     // Ignore if there is no command in the buffer
@@ -577,8 +598,7 @@ void StartLED1(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartLED2 */
-void StartLED2(void *argument)
-{
+void StartLED2(void *argument) {
   /* USER CODE BEGIN StartLED2 */
   while (1) {
     // Ignore if there is no command in the buffer
@@ -601,40 +621,45 @@ void StartLED2(void *argument)
   /* USER CODE END StartLED2 */
 }
 
-/* USER CODE BEGIN Header_StartPWM1 */
+/* USER CODE BEGIN Header_StartPWM */
 /**
-* @brief Function implementing the PWM1 thread.
+* @brief Function implementing the PWM thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartPWM1 */
-void StartPWM1(void *argument)
-{
-  /* USER CODE BEGIN StartPWM1 */
+/* USER CODE END Header_StartPWM */
+void StartPWM(void *argument) {
+  /* USER CODE BEGIN StartPWM */
   /* Infinite loop */
   while (1) {
     // Ignore id there is no command in the buffer
     if (cmdCount == 0)
       continue;
 
-    if (strcmp(cmdVctr[cmdReadIdx][0], "PWM1") == 0) {
-      // Execute the command
-      char param1[ARG_LENGTH];
-      strcpy(param1, cmdVctr[cmdReadIdx][1]);
+    if (strcmp(cmdVctr[cmdReadIdx][0], "PWM") == 0) {
+      // Get the ID of the actuator
+      char id[ARG_LENGTH];
+      strcpy(id, cmdVctr[cmdReadIdx][1]);
+
+      // Get the type of signal
+      char param[ARG_LENGTH];
+      strcpy(param, cmdVctr[cmdReadIdx][2]);
       float dutyCycle;
 
       // Check if the input is a percentage or a duty cycle value
-      if (strcmp(param1, "-p") == 0) {
-        dutyCycle = atof(cmdVctr[cmdReadIdx][2]);
+      if (strcmp(param, "-p") == 0) {
+        dutyCycle = atof(cmdVctr[cmdReadIdx][3]);
         dutyCycle = map(dutyCycle, 0, 100, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
       } else {
-        dutyCycle = atof(param1);
+        dutyCycle = atof(param);
         dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
       }
 
+      // Select the DMux output channel in zero-index notation
+      SelectDeMuxChannel((uint8_t) atoi(id) - 1);
+
       // Calculate the pulse width and set the duty cycle of the signal
       uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
-      // TIM3->CCR2 = pulse;
       __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
 
       // Increase the read index and decrease the command count
@@ -642,9 +667,7 @@ void StartPWM1(void *argument)
       cmdCount--;
     }
   }
-
-  osThreadTerminate(NULL);
-  /* USER CODE END StartPWM1 */
+  /* USER CODE END StartPWM */
 }
 
 /**
@@ -655,8 +678,7 @@ void StartPWM1(void *argument)
   * @param  htim : TIM handle
   * @retval None
   */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
@@ -672,14 +694,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
-void Error_Handler(void)
-{
+void Error_Handler(void) {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
-  while (1)
-  {
-  }
+  while (1);
   /* USER CODE END Error_Handler_Debug */
 }
 
