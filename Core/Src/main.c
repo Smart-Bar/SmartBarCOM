@@ -443,6 +443,15 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
+/**
+ * @brief Callback function for the UART reception.
+ * 
+ * This function is called when a character is received from the UART3 peripheral.
+ * The received character is stored in the rxBuffer and echoed back to the terminal
+ * console connected to the UART2 peripheral. Supports backspace and Enter characters.
+ * 
+ * @param huart 
+ */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   // If the interrupt is not from USART3, ignore it
   if (huart->Instance != USART3)
@@ -483,6 +492,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   HAL_UART_Receive_IT(&huart3, textChar, 1);
 }
 
+/**
+ * @brief Parses the received command and stores it in the command vector.
+ * 
+ * The command is stored in the circular buffer. The buffer is a 3D array that stores
+ * up to 8 commands, each with 5 parameters, increasing the write index and the command
+ * count after storing the command.
+ * 
+ * @retval None
+ */
 void ParseCommand(void) {
   // Parse the command to get its parameters
   char *input = (char*) rxBuffer;
