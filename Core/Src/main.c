@@ -451,6 +451,11 @@ static void MX_GPIO_Init(void) {
  * console connected to the UART2 peripheral. Supports backspace and Enter characters.
  * 
  * @param huart 
+ * @retval None
+ * @note The expected UART instance to receive data is USART3, which is connected to the
+ *       HC-05 Bluetooth module. The UART2 instance is used to echo the received characters
+ *       back to the terminal console, which corresponds to the USB virtual COM port from
+ *       the Nucleo board.
  */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   // If the interrupt is not from USART3, ignore it
