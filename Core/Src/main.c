@@ -125,7 +125,8 @@ void StartPWM(void *argument);
 
 /* USER CODE BEGIN PFP */
 void ParseCommand(void);
-void SelectDeMuxChannel(uint8_t);
+void SelectInputChannel(uint8_t);
+void SelectOutputChannel(uint8_t);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -406,7 +407,7 @@ static void MX_GPIO_Init(void) {
   HAL_GPIO_WritePin(GPIOC, DMUX_C_Pin|DMUX_B_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, MUX_B_Pin|MUX_C_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, DMUX_A_Pin|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
@@ -424,12 +425,18 @@ static void MX_GPIO_Init(void) {
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pin : MUX_A_Pin */
+  GPIO_InitStruct.Pin = MUX_A_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(MUX_A_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : MUX_B_Pin MUX_C_Pin LD2_Pin */
+  GPIO_InitStruct.Pin = MUX_B_Pin|MUX_C_Pin|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : DMUX_A_Pin PB8 PB9 */
   GPIO_InitStruct.Pin = DMUX_A_Pin|GPIO_PIN_8|GPIO_PIN_9;
@@ -529,15 +536,36 @@ void ParseCommand(void) {
 }
 
 /**
- * @brief Selects the output channel of the DeMux.
+ * @brief Selects the input channel of the Mux
  * 
- * Sets the appropriate pin values to pass a signal through the desired channel, which can 
- * be 1 out 8 channels
+ * Sets the appropriate pin values to let a signal come from the desired channel,
+ * which can be 1 out 8 input channels
  * 
  * @param channel Channel to be selected
  * @retval None
  */
-void SelectDeMuxChannel(uint8_t channel) {
+void SelectInputChannel(uint8_t channel) {
+  // Calculate the state for each pin
+  uint8_t A = (channel & 0x01); // bit 0
+  uint8_t B = (channel & 0x02) >> 1; // bit 1
+  uint8_t C = (channel & 0x04) >> 2; // bit 2
+
+  // Set each pin state
+  HAL_GPIO_WritePin(MUX_A_GPIO_Port, MUX_A_Pin, A ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(MUX_B_GPIO_Port, MUX_B_Pin, B ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(MUX_C_GPIO_Port, MUX_C_Pin, C ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+/**
+ * @brief Selects the output channel of the DMux.
+ * 
+ * Sets the appropriate pin values to pass a signal through the desired channel,
+ * which can be 1 out 8 output channels
+ * 
+ * @param channel Channel to be selected
+ * @retval None
+ */
+void SelectOutputChannel(uint8_t channel) {
   // Calculate the state for each pin
   uint8_t A = (channel & 0x01); // bit 0
   uint8_t B = (channel & 0x02) >> 1; // bit 1
@@ -678,8 +706,11 @@ void StartPWM(void *argument) {
         dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
       }
 
+      // Select the MUX input channel in zero-index notation
+      SelectInputChannel(0);
+
       // Select the DMux output channel in zero-index notation
-      SelectDeMuxChannel((uint8_t) atoi(id) - 1);
+      SelectOutputChannel((uint8_t) atoi(id) - 1);
 
       // Calculate the pulse width and set the duty cycle of the signal
       uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);

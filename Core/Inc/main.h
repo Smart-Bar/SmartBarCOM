@@ -65,10 +65,16 @@ void Error_Handler(void);
 #define DMUX_C_GPIO_Port GPIOC
 #define DMUX_B_Pin GPIO_PIN_1
 #define DMUX_B_GPIO_Port GPIOC
+#define MUX_A_Pin GPIO_PIN_0
+#define MUX_A_GPIO_Port GPIOA
+#define MUX_B_Pin GPIO_PIN_1
+#define MUX_B_GPIO_Port GPIOA
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
+#define MUX_C_Pin GPIO_PIN_4
+#define MUX_C_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
 #define DMUX_A_Pin GPIO_PIN_0
