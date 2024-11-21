@@ -89,6 +89,7 @@ void ParseCommand(void);
 void ExecutePWM(CommandVector*);
 void SelectInputChannel(uint8_t);
 void SelectOutputChannel(uint8_t);
+void ComputePID(void);
 float clamp(float, float, float);
 float map(float, float, float, float, float);
 
@@ -180,6 +181,14 @@ void ExecutePWM(CommandVector *cmdVctr) {
   // Calculate the pulse width and set the duty cycle of the signal
   uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
+}
+
+void ExecutePID(CommandVector *cmdVctr) {
+
+}
+
+void ComputePID() {
+
 }
 
 /**

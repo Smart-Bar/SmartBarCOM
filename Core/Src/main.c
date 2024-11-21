@@ -42,6 +42,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim16;
+TIM_HandleTypeDef htim17;
 
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
@@ -50,13 +52,6 @@ UART_HandleTypeDef huart3;
 osThreadId_t ExecuteCommandHandle;
 const osThreadAttr_t ExecuteCommand_attributes = {
   .name = "ExecuteCommand",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for PWM */
-osThreadId_t PWMHandle;
-const osThreadAttr_t PWM_attributes = {
-  .name = "PWM",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
@@ -69,6 +64,8 @@ volatile uint8_t enterPressed = 0;
 uint8_t textChar[2];
 // rxBuffer index
 uint8_t rxIdx;
+// Encoder position as pulses
+volatile long enconderPos;
 
 /* USER CODE END PV */
 
@@ -78,8 +75,9 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM17_Init(void);
+static void MX_TIM16_Init(void);
 void StartExecuteCommand(void *argument);
-void StartPWM(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -120,6 +118,8 @@ int main(void) {
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   MX_TIM3_Init();
+  MX_TIM17_Init();
+  MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
   // HAL_UART_Receive_IT(&huart3, textChar, 1);
   HAL_UART_Receive_IT(&huart2, textChar, 1);
@@ -152,8 +152,6 @@ int main(void) {
   /* Create the thread(s) */
   /* creation of ExecuteCommand */
   ExecuteCommandHandle = osThreadNew(StartExecuteCommand, NULL, &ExecuteCommand_attributes);
-  /* creation of PWM */
-  PWMHandle = osThreadNew(StartPWM, NULL, &PWM_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -215,11 +213,13 @@ void SystemClock_Config(void) {
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
     Error_Handler();
   }
-
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_USART3
-                              |RCC_PERIPHCLK_TIM34;
+                                      |RCC_PERIPHCLK_TIM16|RCC_PERIPHCLK_TIM17
+                                      |RCC_PERIPHCLK_TIM34;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   PeriphClkInit.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
+  PeriphClkInit.Tim16ClockSelection = RCC_TIM16CLK_HCLK;
+  PeriphClkInit.Tim17ClockSelection = RCC_TIM17CLK_HCLK;
   PeriphClkInit.Tim34ClockSelection = RCC_TIM34CLK_HCLK;
 
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
@@ -274,6 +274,111 @@ static void MX_TIM3_Init(void) {
 
   /* USER CODE END TIM3_Init 2 */
   HAL_TIM_MspPostInit(&htim3);
+}
+
+/**
+  * @brief TIM16 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM16_Init(void) {
+  /* USER CODE BEGIN TIM16_Init 0 */
+
+  /* USER CODE END TIM16_Init 0 */
+
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM16_Init 1 */
+
+  /* USER CODE END TIM16_Init 1 */
+  htim16.Instance = TIM16;
+  htim16.Init.Prescaler = 72;
+  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim16.Init.Period = 1;
+  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim16.Init.RepetitionCounter = 0;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+  if (HAL_TIM_Base_Init(&htim16) != HAL_OK) {
+    Error_Handler();
+  }
+
+  if (HAL_TIM_IC_Init(&htim16) != HAL_OK) {
+    Error_Handler();
+  }
+
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+
+  if (HAL_TIM_IC_ConfigChannel(&htim16, &sConfigIC, TIM_CHANNEL_1) != HAL_OK) {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM16_Init 2 */
+
+  /* USER CODE END TIM16_Init 2 */
+}
+
+/**
+  * @brief TIM17 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM17_Init(void) {
+  /* USER CODE BEGIN TIM17_Init 0 */
+
+  /* USER CODE END TIM17_Init 0 */
+
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM17_Init 1 */
+
+  /* USER CODE END TIM17_Init 1 */
+  htim17.Instance = TIM17;
+  htim17.Init.Prescaler = 565;
+  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim17.Init.Period = 255;
+  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim17.Init.RepetitionCounter = 0;
+  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+  if (HAL_TIM_Base_Init(&htim17) != HAL_OK) {
+    Error_Handler();
+  }
+
+  if (HAL_TIM_PWM_Init(&htim17) != HAL_OK) {
+    Error_Handler();
+  }
+
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+
+  if (HAL_TIM_PWM_ConfigChannel(&htim17, &sConfigOC, TIM_CHANNEL_1) != HAL_OK) {
+    Error_Handler();
+  }
+
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim17, &sBreakDeadTimeConfig) != HAL_OK) {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM17_Init 2 */
+
+  /* USER CODE END TIM17_Init 2 */
+  HAL_TIM_MspPostInit(&htim17);
 }
 
 /**
@@ -357,13 +462,13 @@ static void MX_GPIO_Init(void) {
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, DMUX_C_Pin|DMUX_B_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, DMUX_C_Pin|DMUX_B_Pin|PH2_Pin|PH1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, MUX_B_Pin|MUX_C_Pin|LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, MUX_B_Pin|MUX_A_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DMUX_A_Pin|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(DMUX_A_GPIO_Port, DMUX_A_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -371,38 +476,55 @@ static void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DMUX_C_Pin DMUX_B_Pin */
-  GPIO_InitStruct.Pin = DMUX_C_Pin|DMUX_B_Pin;
+  /*Configure GPIO pins : DMUX_C_Pin DMUX_B_Pin PH2_Pin PH1_Pin */
+  GPIO_InitStruct.Pin = DMUX_C_Pin|DMUX_B_Pin|PH2_Pin|PH1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : MUX_A_Pin */
-  GPIO_InitStruct.Pin = MUX_A_Pin;
+  /*Configure GPIO pin : MUX_C_Pin */
+  GPIO_InitStruct.Pin = MUX_C_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(MUX_A_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(MUX_C_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : MUX_B_Pin MUX_C_Pin LD2_Pin */
-  GPIO_InitStruct.Pin = MUX_B_Pin|MUX_C_Pin|LD2_Pin;
+  /*Configure GPIO pins : MUX_B_Pin MUX_A_Pin */
+  GPIO_InitStruct.Pin = MUX_B_Pin|MUX_A_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DMUX_A_Pin PB8 PB9 */
-  GPIO_InitStruct.Pin = DMUX_A_Pin|GPIO_PIN_8|GPIO_PIN_9;
+  /*Configure GPIO pin : DMUX_A_Pin */
+  GPIO_InitStruct.Pin = DMUX_A_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(DMUX_A_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ENC_B_Pin */
+  GPIO_InitStruct.Pin = ENC_B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(ENC_B_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ENC_A_Pin */
+  GPIO_InitStruct.Pin = ENC_A_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(ENC_A_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
 /**
  * @brief Callback function for the UART reception.
  * 
@@ -458,6 +580,27 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   HAL_UART_Receive_IT(&huart2, textChar, 1);
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == ENC_A_Pin) {
+    int stateA = HAL_GPIO_ReadPin(ENC_A_GPIO_Port, ENC_A_Pin);
+    int stateB = HAL_GPIO_ReadPin(ENC_B_GPIO_Port, ENC_B_Pin);
+
+    if (stateA == GPIO_PIN_SET) {
+      if (stateB == GPIO_PIN_RESET) {
+        enconderPos++;
+      } else {
+        enconderPos--;
+      }
+    } else {
+      if (stateB == GPIO_PIN_RESET) {
+        enconderPos--;
+      } else {
+        enconderPos++;
+      }
+    }
+  }
+}
+
 /**
  * @brief Selects the input channel of the Mux
  * 
@@ -501,11 +644,13 @@ void SelectOutputChannel(uint8_t channel) {
 }
 /* USER CODE END 4 */
 
+/* USER CODE BEGIN Header_StartExecuteCommand */
 /**
  * @brief Function implementing the ExecuteCommand thread.
  * 
  * @param argument 
  */
+/* USER CODE END Header_StartExecuteCommand */
 void StartExecuteCommand(void *argument) {
   while (1) {
     // Ignore if there is no command in the buffer
@@ -521,58 +666,6 @@ void StartExecuteCommand(void *argument) {
     cmdReadIdx = (cmdReadIdx + 1) % CIRC_BUFFER_SIZE;
     cmdCount--;
   }
-}
-
-/* USER CODE BEGIN Header_StartPWM */
-/**
-* @brief Function implementing the PWM thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartPWM */
-void StartPWM(void *argument) {
-  /* USER CODE BEGIN StartPWM */
-  /* Infinite loop */
-  while (1) {
-    // // Ignore id there is no command in the buffer
-    // if (cmdCount == 0)
-    //   continue;
-
-    // if (strcmp(cmdVctr[cmdReadIdx][0], "PWM") == 0) {
-    //   // Get the ID of the actuator
-    //   char id[ARG_LENGTH];
-    //   strcpy(id, cmdVctr[cmdReadIdx][1]);
-
-    //   // Get the type of signal
-    //   char param[ARG_LENGTH];
-    //   strcpy(param, cmdVctr[cmdReadIdx][2]);
-    //   float dutyCycle;
-
-    //   // Check if the input is a percentage or a duty cycle value
-    //   if (strcmp(param, "-p") == 0) {
-    //     dutyCycle = atof(cmdVctr[cmdReadIdx][3]);
-    //     dutyCycle = map(dutyCycle, 0, 100, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
-    //   } else {
-    //     dutyCycle = atof(param);
-    //     dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
-    //   }
-
-    //   // Select the MUX input channel in zero-index notation
-    //   SelectInputChannel(0);
-
-    //   // Select the DMux output channel in zero-index notation
-    //   SelectOutputChannel((uint8_t) atoi(id) - 1);
-
-    //   // Calculate the pulse width and set the duty cycle of the signal
-    //   uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
-    //   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
-
-    //   // Increase the read index and decrease the command count
-    //   cmdReadIdx = (cmdReadIdx + 1) % CMD_VCTR_SIZE;
-    //   cmdCount--;
-    // }
-  }
-  /* USER CODE END StartPWM */
 }
 
 /**
