@@ -22,8 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdlib.h>
-#include <string.h>
+#include "cli.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,29 +32,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-// Length of the receive buffer
-#define RX_BUFFER_SIZE          16
-
-// Length of the circular buffer
-#define CIRC_BUFFER_SIZE        8
-
-// Length of the command parameters
-#define ARG_LENGTH              6
-
-// Length of the command vector
-#define CMD_VCTR_SIZE           5
-
-// Minimum duty cycle for the servo motor (2.5% or 0°)
-#define DUTY_CYCLE_LOWER_BOUND  2.5
-
-// Maximum duty cycle for the servo motor (12.5% or 180°)
-#define DUTY_CYCLE_UPPER_BOUND  12.5
-
-// Minimum pulse width for the servo motor
-#define MIN_PULSE_WIDTH         6.375
-
-// Maximum pulse width for the servo motor
-#define MAX_PULSE_WIDTH         31.875
 
 /* USER CODE END PD */
 
@@ -70,17 +46,10 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
-/* Definitions for LED1 */
-osThreadId_t LED1Handle;
-const osThreadAttr_t LED1_attributes = {
-  .name = "LED1",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for LED2 */
-osThreadId_t LED2Handle;
-const osThreadAttr_t LED2_attributes = {
-  .name = "LED2",
+/* Definitions for ExecuteCommand */
+osThreadId_t ExecuteCommandHandle;
+const osThreadAttr_t ExecuteCommand_attributes = {
+  .name = "ExecuteCommand",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
@@ -93,18 +62,8 @@ const osThreadAttr_t PWM_attributes = {
 };
 /* USER CODE BEGIN PV */
 
-// Buffer for storing received data from UART
-char rxBuffer[RX_BUFFER_SIZE];
-
-// Circular buffer for storing commands -> Stores up to 8 commands with 5 parameters each
-char cmdVctr[CIRC_BUFFER_SIZE][CMD_VCTR_SIZE][ARG_LENGTH];
-
 // Flags and indexes
 volatile uint8_t enterPressed = 0;
-volatile uint8_t cmdWriteIdx = 0;
-volatile uint8_t cmdReadIdx = 0;
-volatile uint8_t cmdArgIdx = 0;
-volatile uint8_t cmdCount = 0;
 
 // Stores the last received character
 uint8_t textChar[2];
@@ -119,14 +78,11 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
-void StartLED1(void *argument);
-void StartLED2(void *argument);
+void ExecuteCommand(void *argument);
 void StartPWM(void *argument);
 
 /* USER CODE BEGIN PFP */
-void ParseCommand(void);
-void SelectInputChannel(uint8_t);
-void SelectOutputChannel(uint8_t);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -165,7 +121,8 @@ int main(void) {
   MX_USART3_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart3, textChar, 1);
+  // HAL_UART_Receive_IT(&huart3, textChar, 1);
+  HAL_UART_Receive_IT(&huart2, textChar, 1);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
 
   // Set the initial angle of the servo motor to 0°
@@ -193,12 +150,8 @@ int main(void) {
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of LED1 */
-  LED1Handle = osThreadNew(StartLED1, NULL, &LED1_attributes);
-
-  /* creation of LED2 */
-  LED2Handle = osThreadNew(StartLED2, NULL, &LED2_attributes);
-
+  /* creation of ExecuteCommand */
+  ExecuteCommandHandle = osThreadNew(ExecuteCommand, NULL, &ExecuteCommand_attributes);
   /* creation of PWM */
   PWMHandle = osThreadNew(StartPWM, NULL, &PWM_attributes);
 
@@ -466,14 +419,14 @@ static void MX_GPIO_Init(void) {
  */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   // If the interrupt is not from USART3, ignore it
-  if (huart->Instance != USART3)
+  if (huart->Instance != USART2)
     return;
 
   // Add the received character to the buffer. Ignore Enter and Backspace
   if (textChar[0] != 13 && textChar[0] != 8) {
     rxBuffer[rxIdx++] = textChar[0];
     // Echo the received character
-    HAL_UART_Transmit(&huart2, textChar, 1, 100);
+    // HAL_UART_Transmit(&huart2, textChar, 1, 100);
   }
 
   // Handle backspace. Remove the last character from the buffer
@@ -481,7 +434,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     rxIdx--;
     rxBuffer[rxIdx] = 0;
     // Erase the last character from the terminal
-    HAL_UART_Transmit(&huart2, (uint8_t*)"\b \b", 3, 100);
+    // HAL_UART_Transmit(&huart2, (uint8_t*)"\b \b", 3, 100);
   }
 
   // Handle Enter. Reset the buffer and handle the command
@@ -496,43 +449,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     }
 
     // Echo a newline character
-    HAL_UART_Transmit(&huart2, (uint8_t*)"\n\r", 2, 100);
+    // HAL_UART_Transmit(&huart2, (uint8_t*)"\n\r", 2, 100);
     memset(rxBuffer, 0, RX_BUFFER_SIZE);
   }
 
   // Restart the interrupt-driven reception of a single character
-  HAL_UART_Receive_IT(&huart3, textChar, 1);
-}
-
-/**
- * @brief Parses the received command and stores it in the command vector.
- * 
- * The command is stored in the circular buffer. The buffer is a 3D array that stores
- * up to 8 commands, each with 5 parameters, increasing the write index and the command
- * count after storing the command.
- * 
- * @retval None
- */
-void ParseCommand(void) {
-  // Parse the command to get its parameters
-  char *input = (char*) rxBuffer;
-  char *charPointer = strtok(input, " ");
-  strcpy(cmdVctr[cmdWriteIdx][cmdArgIdx++], charPointer);
-
-  // Continue parsing the command until the end of the buffer
-  do {
-    charPointer = strtok(NULL, " ");
-    if (charPointer != NULL && cmdArgIdx < CMD_VCTR_SIZE) {
-      strcpy(cmdVctr[cmdWriteIdx][cmdArgIdx++], charPointer);
-    }
-  } while (charPointer != NULL && cmdArgIdx < CMD_VCTR_SIZE);
-
-  // Reset the command argument vector index, move to the next write index and increase the command count
-  cmdArgIdx = 0;
-  cmdWriteIdx = (cmdWriteIdx + 1) % CMD_VCTR_SIZE;
-  cmdCount++;
-
-  memset(rxBuffer, 0, sizeof(rxBuffer));
+  // HAL_UART_Receive_IT(&huart3, textChar, 1);
+  HAL_UART_Receive_IT(&huart2, textChar, 1);
 }
 
 /**
@@ -576,100 +499,28 @@ void SelectOutputChannel(uint8_t channel) {
   HAL_GPIO_WritePin(DMUX_B_GPIO_Port, DMUX_B_Pin, B ? GPIO_PIN_SET : GPIO_PIN_RESET);
   HAL_GPIO_WritePin(DMUX_C_GPIO_Port, DMUX_C_Pin, C ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
-
-/**
- * @brief Clamps a value between a lower and upper bound.
- * 
- * @param value Value to be clamped
- * @param lowerBound Lower bound
- * @param upperBound Upper bound
- * 
- * @retval Clamped value
- */
-float clamp(float input, float lowerBound, float upperBound) {
-  return input < lowerBound
-    ? lowerBound
-    : input > upperBound
-      ? upperBound
-      : input;
-}
-
-/**
- * @brief Maps a value from one range to another.
- * 
- * @param value Value to be mapped
- * @param fromLower Lower bound of the input range
- * @param fromUpper Upper bound of the input range
- * @param toLower Lower bound of the output range
- * @param toUpper Upper bound of the output range
- * 
- * @retval Mapped value
- * 
- * @ref https://docs.arduino.cc/language-reference/en/functions/math/map/
- */
-float map(float value, float fromLower, float fromUpper, float toLower, float toUpper) {
-  return (value - fromLower) * (toUpper - toLower) / (fromUpper - fromLower) + toLower;
-}
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartLED1 */
 /**
-  * @brief  Turn on LED1 (connected to GPIOB, Pin 8) for 2 seconds
-  * @param  argument: Not used
-  * @retval None
-  */
-/* USER CODE END Header_StartLED1 */
-void StartLED1(void *argument) {
-  /* USER CODE BEGIN 5 */
+ * @brief Function implementing the ExecuteCommand thread.
+ * 
+ * @param argument 
+ */
+void ExecuteCommand(void *argument) {
   while (1) {
     // Ignore if there is no command in the buffer
     if (cmdCount == 0)
       continue;
 
-    if (strcmp(cmdVctr[cmdReadIdx][0], "LED1") == 0) {
-      // Execute the command
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-      osDelay(2000);
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+    CommandVector *cmdVctr = &circBuffer[cmdReadIdx];
 
-      // Increase the read index and decrease the command count
-      cmdReadIdx = (cmdReadIdx + 1) % CMD_VCTR_SIZE;
-      cmdCount--;
+    if (strcmp(cmdVctr->cmdName, "PWM") == 0) {
+      ExecutePWM(cmdVctr);
     }
+
+    cmdReadIdx = (cmdReadIdx + 1) % CIRC_BUFFER_SIZE;
+    cmdCount--;
   }
-
-  osThreadTerminate(NULL);
-  /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_StartLED2 */
-/**
-* @brief Turn on LED2 (connected to GPIOB, Pin 9) for 3 seconds
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartLED2 */
-void StartLED2(void *argument) {
-  /* USER CODE BEGIN StartLED2 */
-  while (1) {
-    // Ignore if there is no command in the buffer
-    if (cmdCount == 0)
-      continue;
-
-    if (strcmp(cmdVctr[cmdReadIdx][0], "LED2") == 0) {
-      // Execute the command
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
-      osDelay(3000);
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
-
-      // Increase the read index and decrease the command count
-      cmdReadIdx = (cmdReadIdx + 1) % CMD_VCTR_SIZE;
-      cmdCount--;
-    }
-  }
-
-  osThreadTerminate(NULL);
-  /* USER CODE END StartLED2 */
 }
 
 /* USER CODE BEGIN Header_StartPWM */
@@ -683,43 +534,43 @@ void StartPWM(void *argument) {
   /* USER CODE BEGIN StartPWM */
   /* Infinite loop */
   while (1) {
-    // Ignore id there is no command in the buffer
-    if (cmdCount == 0)
-      continue;
+    // // Ignore id there is no command in the buffer
+    // if (cmdCount == 0)
+    //   continue;
 
-    if (strcmp(cmdVctr[cmdReadIdx][0], "PWM") == 0) {
-      // Get the ID of the actuator
-      char id[ARG_LENGTH];
-      strcpy(id, cmdVctr[cmdReadIdx][1]);
+    // if (strcmp(cmdVctr[cmdReadIdx][0], "PWM") == 0) {
+    //   // Get the ID of the actuator
+    //   char id[ARG_LENGTH];
+    //   strcpy(id, cmdVctr[cmdReadIdx][1]);
 
-      // Get the type of signal
-      char param[ARG_LENGTH];
-      strcpy(param, cmdVctr[cmdReadIdx][2]);
-      float dutyCycle;
+    //   // Get the type of signal
+    //   char param[ARG_LENGTH];
+    //   strcpy(param, cmdVctr[cmdReadIdx][2]);
+    //   float dutyCycle;
 
-      // Check if the input is a percentage or a duty cycle value
-      if (strcmp(param, "-p") == 0) {
-        dutyCycle = atof(cmdVctr[cmdReadIdx][3]);
-        dutyCycle = map(dutyCycle, 0, 100, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
-      } else {
-        dutyCycle = atof(param);
-        dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
-      }
+    //   // Check if the input is a percentage or a duty cycle value
+    //   if (strcmp(param, "-p") == 0) {
+    //     dutyCycle = atof(cmdVctr[cmdReadIdx][3]);
+    //     dutyCycle = map(dutyCycle, 0, 100, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
+    //   } else {
+    //     dutyCycle = atof(param);
+    //     dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
+    //   }
 
-      // Select the MUX input channel in zero-index notation
-      SelectInputChannel(0);
+    //   // Select the MUX input channel in zero-index notation
+    //   SelectInputChannel(0);
 
-      // Select the DMux output channel in zero-index notation
-      SelectOutputChannel((uint8_t) atoi(id) - 1);
+    //   // Select the DMux output channel in zero-index notation
+    //   SelectOutputChannel((uint8_t) atoi(id) - 1);
 
-      // Calculate the pulse width and set the duty cycle of the signal
-      uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
-      __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
+    //   // Calculate the pulse width and set the duty cycle of the signal
+    //   uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
+    //   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
 
-      // Increase the read index and decrease the command count
-      cmdReadIdx = (cmdReadIdx + 1) % CMD_VCTR_SIZE;
-      cmdCount--;
-    }
+    //   // Increase the read index and decrease the command count
+    //   cmdReadIdx = (cmdReadIdx + 1) % CMD_VCTR_SIZE;
+    //   cmdCount--;
+    // }
   }
   /* USER CODE END StartPWM */
 }
