@@ -78,7 +78,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
-void ExecuteCommand(void *argument);
+void StartExecuteCommand(void *argument);
 void StartPWM(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -151,7 +151,7 @@ int main(void) {
 
   /* Create the thread(s) */
   /* creation of ExecuteCommand */
-  ExecuteCommandHandle = osThreadNew(ExecuteCommand, NULL, &ExecuteCommand_attributes);
+  ExecuteCommandHandle = osThreadNew(StartExecuteCommand, NULL, &ExecuteCommand_attributes);
   /* creation of PWM */
   PWMHandle = osThreadNew(StartPWM, NULL, &PWM_attributes);
 
@@ -506,7 +506,7 @@ void SelectOutputChannel(uint8_t channel) {
  * 
  * @param argument 
  */
-void ExecuteCommand(void *argument) {
+void StartExecuteCommand(void *argument) {
   while (1) {
     // Ignore if there is no command in the buffer
     if (cmdCount == 0)
