@@ -149,6 +149,7 @@ void ExecutePWM(CommandVector *cmdVctr) {
   int inputChnl = -1;
   int outputChnl = -1;
   float dutyCycle = -1;
+  float time = -1;
 
   // Get the command arguments
   for (int i = 0; i < CMD_VCTR_SIZE; i++) {
@@ -170,6 +171,9 @@ void ExecutePWM(CommandVector *cmdVctr) {
       dutyCycle = atof(cmdVctr->args[i].value);
       dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
     }
+    else if (strcmp(cmdVctr->args[i].name, "-t") == 0) {
+      time = atof(cmdVctr->args[i].value);
+    }
   }
 
   // Select the MUX input channel in zero-index notation
@@ -181,8 +185,32 @@ void ExecutePWM(CommandVector *cmdVctr) {
   // Calculate the pulse width and set the duty cycle of the signal
   uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
   __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
-}
 
+  // Timer for the PWM signal
+  if (time > 0) {
+    uint32_t target = time * 1000000;
+    uint32_t lastTime = __HAL_TIM_GET_COUNTER(&htim16);
+    uint32_t previousCounter = lastTime;
+    uint32_t overflow = 0;
+    uint32_t elapsed = 0;
+
+    // Wait until the target time is reached
+    while (elapsed <= target) {
+      uint32_t currentCounter = __HAL_TIM_GET_COUNTER(&htim16);
+
+      if (currentCounter < previousCounter) {
+          overflow++;
+      }
+
+      // Calculate the elapsed time by adding the overflow (65535 ticks per overflow)
+      // to the current counter value and subtracting the last time
+      elapsed = (overflow * 0x10000 + currentCounter - lastTime);
+      previousCounter = currentCounter;
+    }
+
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+  }
+}
 void ExecutePID(CommandVector *cmdVctr) {
 
 }
