@@ -64,8 +64,6 @@ volatile uint8_t enterPressed = 0;
 uint8_t textChar[2];
 // rxBuffer index
 uint8_t rxIdx;
-// Encoder position as pulses
-volatile long enconderPos;
 
 /* USER CODE END PV */
 
@@ -294,7 +292,7 @@ static void MX_TIM16_Init(void) {
   htim16.Instance = TIM16;
   htim16.Init.Prescaler = 72;
   htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 1;
+  htim16.Init.Period = 65535;
   htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim16.Init.RepetitionCounter = 0;
   htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -316,7 +314,7 @@ static void MX_TIM16_Init(void) {
     Error_Handler();
   }
   /* USER CODE BEGIN TIM16_Init 2 */
-
+  HAL_TIM_Base_Start(&htim16);
   /* USER CODE END TIM16_Init 2 */
 }
 
@@ -372,11 +370,13 @@ static void MX_TIM17_Init(void) {
   sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
   sBreakDeadTimeConfig.BreakFilter = 0;
   sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+
   if (HAL_TIMEx_ConfigBreakDeadTime(&htim17, &sBreakDeadTimeConfig) != HAL_OK) {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM17_Init 2 */
 
+  /* USER CODE BEGIN TIM17_Init 2 */
+  HAL_TIM_PWM_Start(&htim17, TIM_CHANNEL_1);
   /* USER CODE END TIM17_Init 2 */
   HAL_TIM_MspPostInit(&htim17);
 }
@@ -587,15 +587,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
     if (stateA == GPIO_PIN_SET) {
       if (stateB == GPIO_PIN_RESET) {
-        enconderPos++;
+        encoderPos++;
       } else {
-        enconderPos--;
+        encoderPos--;
       }
     } else {
       if (stateB == GPIO_PIN_RESET) {
-        enconderPos--;
+        encoderPos--;
       } else {
-        enconderPos++;
+        encoderPos++;
       }
     }
   }
@@ -657,12 +657,17 @@ void StartExecuteCommand(void *argument) {
     if (cmdCount == 0)
       continue;
 
+    // Get the command from the buffer
     CommandVector *cmdVctr = &circBuffer[cmdReadIdx];
 
+    // Execute the command
     if (strcmp(cmdVctr->cmdName, "PWM") == 0) {
       ExecutePWM(cmdVctr);
+    } else if (strcmp(cmdVctr->cmdName, "PID") == 0) {
+      ExecutePID(cmdVctr);
     }
 
+    // Move to the next command in the buffer
     cmdReadIdx = (cmdReadIdx + 1) % CIRC_BUFFER_SIZE;
     cmdCount--;
   }
