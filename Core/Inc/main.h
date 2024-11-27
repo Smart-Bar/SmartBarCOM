@@ -77,10 +77,12 @@ void Error_Handler(void);
 #define MUX_A_GPIO_Port GPIOA
 #define DMUX_A_Pin GPIO_PIN_0
 #define DMUX_A_GPIO_Port GPIOB
+#define PWM2_Pin GPIO_PIN_14
+#define PWM2_GPIO_Port GPIOB
 #define ENC_B_Pin GPIO_PIN_6
 #define ENC_B_GPIO_Port GPIOC
-#define PWM_Pin GPIO_PIN_7
-#define PWM_GPIO_Port GPIOC
+#define PWM1_Pin GPIO_PIN_7
+#define PWM1_GPIO_Port GPIOC
 #define PH2_Pin GPIO_PIN_8
 #define PH2_GPIO_Port GPIOC
 #define PH1_Pin GPIO_PIN_9
