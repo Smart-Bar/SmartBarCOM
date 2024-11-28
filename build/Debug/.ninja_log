@@ -48,7 +48,10 @@
 363	662	7544294046369057	SmartBarCOM.elf	5ffd9507252af06a
 19	401	7544296199941474	CMakeFiles/SmartBarCOM.dir/Core/Src/main.c.obj	fa6badc95fdda3f
 402	1528	7544296210956302	SmartBarCOM.elf	5ffd9507252af06a
+<<<<<<< HEAD
 47	998	7545984099949787	CMakeFiles/SmartBarCOM.dir/Core/Src/main.c.obj	fa6badc95fdda3f
 998	2451	7545984114278759	SmartBarCOM.elf	5ffd9507252af06a
 22	400	7545985700454833	CMakeFiles/SmartBarCOM.dir/Core/Src/main.c.obj	fa6badc95fdda3f
 401	690	7545985703045274	SmartBarCOM.elf	5ffd9507252af06a
+=======
+>>>>>>> cc2c6e3 (Minor changes)
