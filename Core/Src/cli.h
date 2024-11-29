@@ -6,28 +6,24 @@
 #include <string.h>
 
 // Length of the receive buffer
-#define RX_BUFFER_SIZE          24
+#define RX_BUFFER_SIZE                24
 
 // Length of the circular buffer
-#define CIRC_BUFFER_SIZE        8
+#define CIRC_BUFFER_SIZE              16
 
 // Length of the command vector
-#define CMD_VCTR_SIZE           6
+#define CMD_VCTR_SIZE                 8
 
 // Length of the command parameters
-#define ARG_LENGTH              4
+#define ARG_LENGTH                    4
 
 // Minimum duty cycle for the servo motor (2.5% or 0°)
-#define DUTY_CYCLE_LOWER_BOUND  2.5
+#define SERVO_DUTY_CYCLE_LOWER_BOUND  2.5
 
 // Maximum duty cycle for the servo motor (12.5% or 180°)
-#define DUTY_CYCLE_UPPER_BOUND  12.5
+#define SERVO_DUTY_CYCLE_UPPER_BOUND  12.5
 
-// Minimum pulse width for the servo motor
-#define MIN_PULSE_WIDTH         6.375
-
-// Maximum pulse width for the servo motor
-#define MAX_PULSE_WIDTH         31.875
+#define PID_THRESHOLD                 0.90
 
 // Buffer for storing received data from UART
 char rxBuffer[RX_BUFFER_SIZE];
