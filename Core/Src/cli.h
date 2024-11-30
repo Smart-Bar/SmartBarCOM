@@ -77,15 +77,38 @@ volatile uint8_t cmdWriteIdx = 0;
 volatile uint8_t cmdReadIdx = 0;
 volatile uint8_t cmdCount = 0;
 
+double target = 0.0;
+double input = 0.0;
+double output = 0.0;
+volatile long encoderPos;
+double pulsesPerRev = 580.0;
+uint32_t interval = 20000;
+
+double Kp = 0.55273;
+double Ki = 0.30508;
+double Kd = 0.05222;
+
+double lastInput = 0.0;
+double integral = 0.0;
+double integralMax = 100.0;
+double integralMin = -100.0;
+uint32_t lastTime = 0;
+uint8_t motorSpeed = 0;
+
 extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim15;
+extern TIM_HandleTypeDef htim16;
+extern TIM_HandleTypeDef htim17;
 
 /* Function protoypes */
 
 void ParseCommand(void);
 void ExecutePWM(CommandVector*);
+void ExecutePID(CommandVector *);
 void SelectInputChannel(uint8_t);
 void SelectOutputChannel(uint8_t);
 void ComputePID(void);
+void setPWMPulse(int, float);
 float clamp(float, float, float);
 float map(float, float, float, float, float);
 
@@ -160,12 +183,6 @@ void ExecutePWM(CommandVector *cmdVctr) {
     // Duty cycle (as a percentage)
     else if (strcmp(cmdVctr->args[i].name, "-d") == 0) {
       dutyCycle = atof(cmdVctr->args[i].value);
-      dutyCycle = map(dutyCycle, 0, 100, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
-    }
-    // ARR value (as an integer)
-    else if (strcmp(cmdVctr->args[i].name, "-a") == 0) {
-      dutyCycle = atof(cmdVctr->args[i].value);
-      dutyCycle = clamp(dutyCycle, DUTY_CYCLE_LOWER_BOUND, DUTY_CYCLE_UPPER_BOUND);
     }
     else if (strcmp(cmdVctr->args[i].name, "-t") == 0) {
       time = atof(cmdVctr->args[i].value);
@@ -179,8 +196,7 @@ void ExecutePWM(CommandVector *cmdVctr) {
   SelectOutputChannel((uint8_t) outputChnl - 1);
 
   // Calculate the pulse width and set the duty cycle of the signal
-  uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
-  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
+  setPWMPulse(inputChnl - 1, dutyCycle);
 
   // Timer for the PWM signal
   if (time > 0) {
@@ -195,7 +211,7 @@ void ExecutePWM(CommandVector *cmdVctr) {
       uint32_t currentCounter = __HAL_TIM_GET_COUNTER(&htim16);
 
       if (currentCounter < previousCounter) {
-          overflow++;
+        overflow++;
       }
 
       // Calculate the elapsed time by adding the overflow (65535 ticks per overflow)
@@ -204,15 +220,73 @@ void ExecutePWM(CommandVector *cmdVctr) {
       previousCounter = currentCounter;
     }
 
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+    // Stop the PWM signal
+    setPWMPulse(inputChnl - 1, 0.0);
   }
 }
-void ExecutePID(CommandVector *cmdVctr) {
 
+/**
+ * @brief Executes the PID command.
+ * 
+ * This function executes the instruction to move the axis to a specific position, as the number
+ * of revolutions to be made by the motor.
+ * 
+ * @param cmdVctr 
+ */
+void ExecutePID(CommandVector *cmdVctr) {
+  target = atof(cmdVctr->args[0].value) * pulsesPerRev;
+  uint32_t lastTime = __HAL_TIM_GET_COUNTER(&htim16);
+
+  while (encoderPos != (target * PID_THRESHOLD)) {
+    uint32_t now = __HAL_TIM_GET_COUNTER(&htim16);
+    uint32_t elapsed = now >= lastTime ? (now - lastTime) : ((0xFFFF - lastTime) + now + 1);
+
+    if (elapsed >= interval) {
+      lastTime = now;
+      input = encoderPos;
+
+      ComputePID();
+
+      if (output > 0) {
+        HAL_GPIO_WritePin(PH1_GPIO_Port, PH1_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(PH2_GPIO_Port, PH2_Pin, GPIO_PIN_RESET);
+        motorSpeed = output;
+      } else {
+        HAL_GPIO_WritePin(PH1_GPIO_Port, PH1_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(PH2_GPIO_Port, PH2_Pin, GPIO_PIN_SET);
+        motorSpeed = -output;
+      }
+
+      motorSpeed = clamp(motorSpeed, 0, 255);
+      __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, motorSpeed);  // Ajusta el PWM
+    }
+  }
+
+  HAL_GPIO_WritePin(PH1_GPIO_Port, PH1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PH2_GPIO_Port, PH2_Pin, GPIO_PIN_RESET);
+  __HAL_TIM_SET_COMPARE(&htim17, TIM_CHANNEL_1, 0);
 }
 
 void ComputePID() {
+  uint32_t now = __HAL_TIM_GET_COUNTER(&htim16);
+  uint32_t deltaMicros = now - lastTime;
+  lastTime = now;
 
+  double deltaTime = deltaMicros / 1000000.0;
+  double error = target - input;
+  integral += error * deltaTime;
+
+  if (integral > integralMax) integral = integralMax;
+  if (integral < integralMin) integral = integralMin;
+
+  double derivative = (input - lastInput) / deltaTime;
+
+  output = Kp * error + Ki * integral + Kd * derivative;
+
+  if (output > 255) output = 255;
+  if (output < -255) output = -255;
+
+  lastInput = input;
 }
 
 /**
@@ -247,6 +321,33 @@ float clamp(float input, float lowerBound, float upperBound) {
  */
 float map(float value, float fromLower, float fromUpper, float toLower, float toUpper) {
   return (value - fromLower) * (toUpper - toLower) / (fromUpper - fromLower) + toLower;
+}
+
+/**
+ * @brief Sets the PWM pulse width.
+ * 
+ * This function sets the pulse width of the PWM signal and adjusts the duty cycle of the signal
+ * based on the input channel and the desired duty cycle.
+ * 
+ * @param inputChannel 
+ * @param dutyCycle 
+ * @return float 
+ */
+void setPWMPulse(int inputChannel, float dutyCycle) {
+  // Maps the duty cycle from a percentage to a value between 2.5 and 12.5, corresponding to 0° and 180°
+  // in the servo motor
+  if (inputChannel == 0) {
+    dutyCycle = map(dutyCycle, 0, 100, SERVO_DUTY_CYCLE_LOWER_BOUND, SERVO_DUTY_CYCLE_UPPER_BOUND);
+  }
+
+  uint8_t pulse = (uint8_t)((dutyCycle / 100.0) * 255);
+
+  // Selectes the proper timer and channel to set the duty cycle of the signal
+  if (inputChannel == 0) {
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse);
+  } else if (inputChannel == 1) {
+    __HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_1, pulse);
+  }
 }
 
 #endif // CLI_H
