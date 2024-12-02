@@ -23,6 +23,7 @@
 // Maximum duty cycle for the servo motor (12.5% or 180°)
 #define SERVO_DUTY_CYCLE_UPPER_BOUND  12.5
 
+// Threshold for the PID controller
 #define PID_THRESHOLD                 0.90
 
 // Buffer for storing received data from UART
