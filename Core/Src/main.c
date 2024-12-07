@@ -4,7 +4,6 @@
 
 #include "cli.h"
 
-/* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim15;
 TIM_HandleTypeDef htim16;
