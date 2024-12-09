@@ -12,14 +12,12 @@ TIM_HandleTypeDef htim17;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
-/* Definitions for ExecuteCommand */
 osThreadId_t ExecuteCommandHandle;
 const osThreadAttr_t ExecuteCommand_attributes = {
   .name = "ExecuteCommand",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* USER CODE BEGIN PV */
 
 // Flags and indexes
 volatile uint8_t enterPressed = 0;
