@@ -5,9 +5,9 @@
 31	777	7544276165682998	CMakeFiles/SmartBarCOM.dir/Core/Src/stm32f3xx_hal_timebase_tim.c.obj	4e11a061f104be7a
 26	875	7544276166398097	CMakeFiles/SmartBarCOM.dir/Core/Src/stm32f3xx_hal_msp.c.obj	62e6fe4f2ef71ad5
 53	794	7544276165712874	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_gpio.c.obj	334147ed72ea27ad
-60	1033	7544276167573323	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_dma.c.obj	a1abbd88dfb5c0
 22	894	7544276166678086	CMakeFiles/SmartBarCOM.dir/Core/Src/stm32f3xx_it.c.obj	7046a5c34ebb2c92
 1819	2576	7544276183545020	CMakeFiles/SmartBarCOM.dir/Middlewares/Third_Party/FreeRTOS/Source/event_groups.c.obj	9c021fb211bfe922
+60	1033	7544276167573323	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_dma.c.obj	a1abbd88dfb5c0
 36	868	7544276166198111	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal.c.obj	c349d38cc34560ad
 1813	2282	7544276180539257	CMakeFiles/SmartBarCOM.dir/Middlewares/Third_Party/FreeRTOS/Source/croutine.c.obj	d81ea4d988c7a829
 22	400	7545985700454833	CMakeFiles/SmartBarCOM.dir/Core/Src/main.c.obj	fa6badc95fdda3f
@@ -24,7 +24,7 @@
 895	1819	7544276175699189	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_i2c_ex.c.obj	25534050ddf7485c
 1945	2673	7544276183965035	CMakeFiles/SmartBarCOM.dir/Middlewares/Third_Party/FreeRTOS/Source/list.c.obj	8f368a9c97ba241c
 2424	3006	7544276188026105	CMakeFiles/SmartBarCOM.dir/Middlewares/Third_Party/FreeRTOS/Source/timers.c.obj	35d91b82a9c62f8b
-22	811	7574990460593619	build.ninja	cfba8fda170fcc03
+22	811	7576718207740732	build.ninja	cfba8fda170fcc03
 1044	2295	7544276180072928	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_tim_ex.c.obj	2cb22d78d18226ef
 1038	2585	7544276183675039	CMakeFiles/SmartBarCOM.dir/Drivers/STM32F3xx_HAL_Driver/Src/stm32f3xx_hal_tim.c.obj	efa989c8497b1aea
 2680	3007	7544276188161326	CMakeFiles/SmartBarCOM.dir/Core/Src/sysmem.c.obj	65d0aab46490c3cf
