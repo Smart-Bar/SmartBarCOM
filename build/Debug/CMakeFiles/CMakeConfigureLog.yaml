@@ -127,3 +127,15 @@ events:
         D:/STM32_Projects/SmartBarCOM/build/Debug/CMakeFiles/3.28.1/CompilerIdCXX/CMakeCXXCompilerId.o
       
 ...
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake:228 (message)"
+      - "CMakeLists.txt:31 (enable_language)"
+    message: |
+      The target system is: Generic -  - arm
+      The host system is: Windows - 10.0.26100 - AMD64
+...
